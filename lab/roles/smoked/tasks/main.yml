@@ -1,0 +1,14 @@
+---
+- name: Check smoke apps
+  uri: 
+   url: "{{ app_test_url }}"
+   status_code: 200
+   timeout: 300
+  register: amiup
+  until: "200 == amiup.status" 
+  retries: 50
+  delay: 5
+
+- name: deprovision project
+  shell: oc delete project smoke-test
+

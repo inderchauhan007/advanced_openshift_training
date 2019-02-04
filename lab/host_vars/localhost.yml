@@ -1,0 +1,153 @@
+---
+sed_guid: ef4c
+guid: '{{sed_guid}}'
+ocp_template_dir: "{{ playbook_dir }}/ocp_template"
+app_test_url: http://nodejs-mongo-persistent-smoke-test.apps.{{guid}}.example.opentlc.com
+ 
+
+######### HOST JINJA PARAMETERS ##############################
+host_jinja:
+ cluster:
+  guid: "{{guid}}"
+  public_dns_suffix: example.opentlc.com
+  private_dns_suffix: internal
+  public_hostname: loadbalancer1
+  app_hostname: apps
+ node:
+  masters:
+    - hostname: master1
+    - hostname: master2
+    - hostname: master3
+  infra:
+    - hostname: infranode1
+    - hostname: infranode2
+  workernode:
+    - hostname: node1
+    - hostname: node2
+    - hostname: node3
+    - hostname: node4
+  storage: support1
+  loadbalancer: loadbalancer1
+
+
+########## MULTITENANCY #######################
+
+multitenant:
+ nodes:
+  - node: 
+     name: node1.{{guid}}.internal
+     label: alpha
+  - node: 
+     name: node2.{{guid}}.internal
+     label: beta
+  - node: 
+     name: node3.{{guid}}.internal
+     label: common
+  - node: 
+     name: node4.{{guid}}.internal
+     label: common
+
+
+## USERS ############################
+users:
+ - user:
+    name: amy
+    password: r3dh4t1!
+    group: alpha
+ - user:
+    name: andrew
+    password: r3dh4t1!
+    group: alpha
+ - user:
+    name: brian
+    password: r3dh4t1!
+    group: beta
+ - user:
+    name: betty
+    password: r3dh4t1!
+    group: beta
+ - user:
+    name: admin
+    password: admin
+    group: poweruser
+
+
+## PV TEMPLATE GENERATION ##################
+pv_template:
+  nfs_node: support1.{{guid}}.internal
+  rwo:
+    from: 1
+    to: 25
+    size: 5Gi
+    mode: ReadWriteOnce
+  rwx:
+    from: 26
+    to: 50
+    size: 10Gi
+    mode: ReadWriteMany
+
+
+##- APPLIER -###########################################
+## Applier for Cluster Content ###########################
+applier:
+  volumes:
+   - object: PersistentVolume
+     content:
+      - name: PV creations for user
+        file: "{{playbook_dir}}/ocp_template/pvs/"
+        #params: "{{ playbook_dir }}/ocp_template/param/dump"
+
+  smoketest:
+   - object: projectRequest
+     content:
+      - name: smoke-test
+        file: "{{ playbook_dir }}/ocp_template/smoketest/projectreq.yml"
+        file_action: create
+
+   - object: deployment
+     content:
+      - name: smoked-nodejs
+        template: "{{ playbook_dir }}/ocp_template/smoketest/template/app-template.yml"
+        params: "{{ playbook_dir }}/ocp_template/smoketest/param/smoke-param"
+        namepace: smoke-test
+     #post-steps:
+     # - role: /home/rfoe-redhat.com/ocp-ha-homework/lab/roles/smoked/tasks/main.yml
+
+  app_pipeline:
+   - object: projects
+     content:
+      - name: "create environments"
+        file: "{{ playbook_dir }}/ocp_template/app_pipeline/template/projects.yml"
+        file_action: create
+   - object: deployments
+     content:
+      - name: "deploy jenkins environment"
+        template: "{{ playbook_dir }}/ocp_template/app_pipeline/template/jenkins-persistent.yml"
+        params: "{{playbook_dir}}/ocp_template/app_pipeline/param/jenkinsparam"
+      - name: "deploy dev environment"
+        template: "{{ playbook_dir }}/ocp_template/app_pipeline/template/deployment.yml"
+        params: "{{playbook_dir}}/ocp_template/app_pipeline/param/deployment-dev"
+      - name: "deply stage environment"
+        template: "{{ playbook_dir }}/ocp_template/app_pipeline/template/deployment.yml"
+        params: "{{playbook_dir}}/ocp_template/app_pipeline/param/deployment-stage"
+      - name: "deply prod environment"
+        template: "{{ playbook_dir }}/ocp_template/app_pipeline/template/deployment.yml"
+        params: "{{playbook_dir}}/ocp_template/app_pipeline/param/deployment-prod"
+   - object: hpa
+     content:
+      - name: "Set HPA"
+        template: "{{ playbook_dir }}/ocp_template/app_pipeline/template/hpa.yml"
+        params: "{{ playbook_dir }}/ocp_template/app_pipeline/param/hpa-prod"
+   - object: builds
+     content:
+      - name: "deploy build pipeline to dev"
+        template: "{{ playbook_dir }}/ocp_template/app_pipeline/template/build.yml"
+        params: "{{ playbook_dir }}/ocp_template/app_pipeline/param/build-dev"
+## May not need proj_template
+  proj_template:
+   - object: projectTemplate
+     content:
+      - name: "Apply new Template"
+        file: "{{playbook_dir}}/ocp_template/multitenant/template/project-req-template.yaml"
+        file_action: create
+        namespaces: default
