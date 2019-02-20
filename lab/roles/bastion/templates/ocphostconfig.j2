@@ -134,7 +134,7 @@ openshift_logging_storage_nfs_options='*(rw,root_squash)'
 openshift_logging_storage_volume_name=logging
 openshift_logging_storage_volume_size=10Gi
 openshift_logging_storage_labels={'storage': 'logging'}
-openshift_logging_es_nodeselector={"node-type":"infrahost"}
+openshift_logging_es_nodeselector={"node-role.kubernetes.io/infra":"true"}
 openshift_logging_es_cluster_size=1
 
 
